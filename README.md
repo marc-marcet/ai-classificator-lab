@@ -1,6 +1,6 @@
-# Julia-1 Decision Playground
+# AI Classificator Lab
 
-A serverless web playground for **[Julia-1](https://huggingface.co/SupersonicLabs/Julia-1)** — the open, Apache-2.0 reimplementation of TypeSafe's **[Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev)** "System One" decision model.
+A serverless lab for **AI classification models** — routing, scoring and boolean decisions with calibrated probabilities — running entirely in the visitor's browser. Its first resident is **[Julia-1](https://huggingface.co/SupersonicLabs/Julia-1)**, the open, Apache-2.0 reimplementation of TypeSafe's **[Jev](https://typesafe.ai/blog/introducing-system-one-models-and-jev)** "System One" decision model.
 
 State + question + 2–20 options in → one selected option with calibrated probabilities out. **All inference runs in the visitor's browser** via ONNX Runtime Web (WebGPU, WASM fallback). No backend, no API keys, zero per-query cost, and user text never leaves the tab.
 

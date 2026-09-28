@@ -1,9 +1,9 @@
 {
-  "name": "julia-decision-playground",
+  "name": "ai-classificator-lab",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Browser playground for the open Jev-style decision model Julia-1: local WebGPU inference with probability visualization.",
+  "description": "Lab for AI classification models in the browser: local WebGPU inference with probability visualization.",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
