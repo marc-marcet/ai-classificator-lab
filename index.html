@@ -3,105 +3,132 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Classificator Lab · Julia-1</title>
+    <title>Classificator AI Lab · Julia-1</title>
     <meta
       name="description"
       content="Experiment with AI classification models - routing, scoring and boolean decisions - running entirely in your browser via WebGPU. No server, no API key."
     />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
-    <header class="site-header">
-      <div>
-        <div class="eyebrow">AI Classificator Lab · runs in your browser</div>
-        <h1>AI Classificator Lab</h1>
-        <p class="intro">
-          Julia&#8209;1 is an open 144M-parameter clone of TypeSafe's
-          <em>Jev</em> "System One" decision model: give it a <strong>state</strong>, a
-          <strong>question</strong> and 2–20 <strong>options</strong>, and it returns a choice with
-          calibrated probabilities. Everything below runs <strong>locally</strong> via WebGPU —
-          your text never leaves this tab.
+    <canvas id="bg" aria-hidden="true"></canvas>
+    <div class="glow glow-a" aria-hidden="true"></div>
+    <div class="glow glow-b" aria-hidden="true"></div>
+
+    <div class="page">
+      <header class="site-header">
+        <div class="header-text">
+          <div class="eyebrow">Decisions at GPU speed</div>
+          <h1>Classificator <span class="grad">AI Lab</span></h1>
+        </div>
+        <div class="header-controls">
+          <label class="visually-hidden" for="model-select">Model</label>
+          <select id="model-select" title="Model"></select>
+        </div>
+      </header>
+
+      <section id="loader-card" class="card glass loader-card" aria-label="Model loading">
+        <div class="loader-head">
+          <div>
+            <h2>Load the model</h2>
+            <p class="muted">
+              One-time download of ~590 MB (FP32 weights, graph and tokenizer), cached by your
+              browser afterwards. Inference then runs on <strong>your</strong> GPU.
+            </p>
+          </div>
+          <button id="load-btn" class="primary big">Load model</button>
+        </div>
+        <div id="load-progress" class="progress" hidden>
+          <div class="bar"><div id="load-bar-fill" class="bar-fill"></div></div>
+          <div class="progress-meta muted small">
+            <span id="load-file">Preparing…</span>
+            <span id="load-pct">0%</span>
+          </div>
+        </div>
+        <p id="load-status" class="status" role="status">
+          WebGPU support: <span id="webgpu-detect">checking…</span>
         </p>
-      </div>
-      <div id="engine-chip" class="chip" hidden></div>
-    </header>
+      </section>
 
-    <section id="loader-card" class="card loader-card" aria-label="Model loading">
-      <div class="loader-head">
-        <div>
-          <h2>Load the model</h2>
-          <p class="muted">
-            One-time download of ~590 MB (FP32 weights, graph and tokenizer), cached by your
-            browser afterwards. Inference then runs on <strong>your</strong> GPU.
-          </p>
-        </div>
-        <button id="load-btn" class="primary big">Load model</button>
-      </div>
-      <div id="load-progress" class="progress" hidden>
-        <div class="bar"><div id="load-bar-fill" class="bar-fill"></div></div>
-        <div class="progress-meta muted small">
-          <span id="load-file">Preparing…</span>
-          <span id="load-pct">0%</span>
-        </div>
-      </div>
-      <p id="load-status" class="status" role="status">
-        WebGPU support: <span id="webgpu-detect">checking…</span>
-      </p>
-    </section>
+      <main id="app" hidden>
+        <nav id="demo-tabs" class="tabs" aria-label="Example decisions"></nav>
 
-    <main id="app" hidden>
-      <nav id="demo-tabs" class="tabs" aria-label="Example decisions"></nav>
-
-      <div class="workspace">
-        <section class="card" aria-label="Decision input">
-          <h2>Decision</h2>
-          <div class="form-row">
-            <div>
-              <label for="type">Request type</label>
-              <select id="type">
-                <option value="choice">Choice - pick one option</option>
-                <option value="score">Score - ordered rubric (0 to n)</option>
-                <option value="noul">Noul - boolean (false/true)</option>
-              </select>
+        <div class="workspace">
+          <section class="card glass form-card" aria-label="Decision input">
+            <h2>Decision</h2>
+            <div class="type-row">
+              <div class="type-control">
+                <label for="type">Request type</label>
+                <select id="type">
+                  <option value="choice">Choice</option>
+                  <option value="score">Score</option>
+                  <option value="noul">Noul</option>
+                </select>
+              </div>
+              <p id="type-hint" class="type-desc muted small"></p>
             </div>
-            <div>
-              <label for="question">Question</label>
-              <input id="question" type="text" spellcheck="false" />
+
+            <label for="question">Question</label>
+            <input id="question" type="text" spellcheck="false" />
+
+            <label for="state">State <span class="muted small">(the evidence/context)</span></label>
+            <textarea id="state" rows="4" spellcheck="false"></textarea>
+
+            <label for="options">Options <span class="muted small">(one per line, 2 to 20)</span></label>
+            <textarea id="options" rows="5" spellcheck="false"></textarea>
+
+            <div class="buttons">
+              <button id="decide-btn" class="primary big" disabled>Decide <kbd>Ctrl ⏎</kbd></button>
             </div>
+            <p id="error" class="error" role="alert" hidden></p>
+          </section>
+
+          <div class="side-col">
+            <section class="card glass result-card" aria-label="Decision result">
+              <div class="card-head">
+                <h2>Result</h2>
+                <span id="confidence-chip" class="confidence-chip" hidden></span>
+              </div>
+              <p id="result-empty" class="muted">Run a decision to see the probability distribution.</p>
+              <div id="result" class="result" aria-live="polite"></div>
+            </section>
+
+            <section class="card glass perf-card" aria-label="Performance">
+              <div class="card-head">
+                <h2>Performance</h2>
+                <span class="perf-actions">
+                  <button id="stress-btn" class="ghost small-btn" disabled>Stress test ×25</button>
+                  <button id="stress-cancel" class="ghost small-btn danger" hidden>Stop</button>
+                </span>
+              </div>
+              <div class="stats">
+                <div class="stat"><span class="stat-val" id="stat-last">–</span><span class="stat-key">last</span></div>
+                <div class="stat"><span class="stat-val" id="stat-med">–</span><span class="stat-key">median</span></div>
+                <div class="stat"><span class="stat-val" id="stat-p95">–</span><span class="stat-key">p95</span></div>
+                <div class="stat"><span class="stat-val" id="stat-rate">–</span><span class="stat-key">decisions/s</span></div>
+              </div>
+              <canvas id="latency-chart" height="72"></canvas>
+              <p class="hint muted small">Latency per decision, last 30 runs, measured in this session. Every run happens on your GPU - nothing leaves the tab.</p>
+            </section>
           </div>
+        </div>
+      </main>
 
-          <label for="state">State <span class="muted small">(the evidence/context)</span></label>
-          <textarea id="state" rows="4" spellcheck="false"></textarea>
-
-          <label for="options">Options <span class="muted small">(one per line, 2 to 20)</span></label>
-          <textarea id="options" rows="5" spellcheck="false"></textarea>
-          <p id="type-hint" class="hint muted small"></p>
-
-          <div class="buttons">
-            <button id="decide-btn" class="primary big" disabled>Decide</button>
-            <span id="decide-timing" class="muted small"></span>
-          </div>
-          <p id="error" class="error" role="alert" hidden></p>
-        </section>
-
-        <section class="card" aria-label="Decision result">
-          <h2>Result</h2>
-          <p id="result-empty" class="muted">Run a decision to see the probability distribution.</p>
-          <div id="result" class="result" aria-live="polite"></div>
-        </section>
-      </div>
-    </main>
-
-    <footer class="site-footer muted small">
-      <p>
-        Model: <a href="https://huggingface.co/SupersonicLabs/Julia-1-ONNX" target="_blank" rel="noreferrer">SupersonicLabs/Julia-1-ONNX</a>
-        (Apache-2.0), an open reimplementation of the
-        <a href="https://typesafe.ai/blog/introducing-system-one-models-and-jev" target="_blank" rel="noreferrer">Jev</a>
-        decision-model concept · Inference: ONNX Runtime Web (WebGPU, WASM fallback) ·
-        Strict encoding parity-tested upstream: 100/100 matching predictions.
-      </p>
-    </footer>
+      <footer class="site-footer muted small">
+        <p>
+          Running <a href="https://huggingface.co/SupersonicLabs/Julia-1" target="_blank" rel="noreferrer">Julia-1</a>,
+          an open Apache-2.0 144M-parameter decision model by Supersonic Labs.
+          All inference runs locally in your browser via WebGPU - your text never leaves this tab.
+        </p>
+      </footer>
+    </div>
 
     <script type="module" src="/src/main.js"></script>
   </body>

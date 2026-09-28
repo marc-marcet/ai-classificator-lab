@@ -67,7 +67,52 @@ function serialize(tokenizer, row, maxLength, headLength, strict) {
   return { ids, markers, qtype: TYPES[type] };
 }
 
-async function fetchWithProgress(url, onProgress, label) {
+// Persistent model cache (OPFS): survives reloads and browser restarts, on
+// localhost and on static hosts alike. The HTTP cache alone is not reliable
+// for the big HF CDN files (signed redirects + revalidation), so we store the
+// bytes explicitly on first download. OPFS is used because Cache Storage's
+// cache.put silently failed for the 550 MB weights in testing; OPFS streams
+// to disk and handles multi-hundred-MB blobs without issue.
+let opfsRootPromise = null;
+function opfsRoot() {
+  if (!opfsRootPromise) {
+    opfsRootPromise = navigator.storage?.getDirectory
+      ? navigator.storage.getDirectory().catch(() => null)
+      : Promise.resolve(null);
+  }
+  return opfsRootPromise;
+}
+
+async function readOpfsFile(dir, name, onProgress, label) {
+  const fh = await dir.getFileHandle(name);
+  const file = await fh.getFile();
+  // Read in chunks so the progress bar animates instead of freezing.
+  const total = file.size;
+  const bytes = new Uint8Array(total);
+  const CHUNK = 16 * 1024 * 1024;
+  for (let offset = 0; offset < total; offset += CHUNK) {
+    const buf = await file.slice(offset, offset + CHUNK).arrayBuffer();
+    bytes.set(new Uint8Array(buf), offset);
+    onProgress?.(label, Math.min(offset + CHUNK, total), total, true);
+  }
+  return bytes;
+}
+
+async function writeOpfsFile(dir, name, bytes) {
+  const fh = await dir.getFileHandle(name, { create: true });
+  const writable = await fh.createWritable();
+  await writable.write(bytes);
+  await writable.close();
+}
+
+async function fetchWithProgress(url, onProgress, label, opfsName) {
+  const dir = await opfsRoot();
+  if (dir && opfsName) {
+    try {
+      const bytes = await readOpfsFile(dir, opfsName, onProgress, label);
+      return bytes;
+    } catch { /* not cached yet - fall through to network */ }
+  }
   const response = await fetch(url);
   if (!response.ok) throw new Error(`${label}: HTTP ${response.status}`);
   const total = Number(response.headers.get('content-length')) || 0;
@@ -83,13 +128,20 @@ async function fetchWithProgress(url, onProgress, label) {
     if (single) single.set(value, loaded);
     else chunks.push(value);
     loaded += value.length;
-    onProgress?.(label, loaded, total);
+    onProgress?.(label, loaded, total, false);
   }
-  if (single) return single;
-  const out = new Uint8Array(loaded);
-  let offset = 0;
-  for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.length; }
-  return out;
+  const bytes = single ?? (() => {
+    const out = new Uint8Array(loaded);
+    let offset = 0;
+    for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.length; }
+    return out;
+  })();
+  // Persist after the read completes so a mid-download failure never stores
+  // a truncated file. Storage errors are non-fatal: next load just re-downloads.
+  if (dir && opfsName) {
+    try { await writeOpfsFile(dir, opfsName, bytes); } catch { /* quota or unsupported */ }
+  }
+  return bytes;
 }
 
 export class JuliaEngine {
@@ -110,18 +162,18 @@ export class JuliaEngine {
     // for module scripts — so fetch the glue code and import it from a blob
     // URL instead. The .wasm is passed as bytes, so import.meta.url is unused.
     const wasmJsUrl = new URL('wasm/julia_webgpu_encode.js', base).href;
-    const glueResponse = await fetch(wasmJsUrl);
-    if (!glueResponse.ok) throw new Error(`WASM glue download failed: HTTP ${glueResponse.status}`);
+    const glueBytes = await fetchWithProgress(wasmJsUrl, progress, 'wasm-glue', 'julia-wasm-glue.js');
     const glueUrl = URL.createObjectURL(
-      new Blob([await glueResponse.text()], { type: 'text/javascript' }));
+      new Blob([glueBytes], { type: 'text/javascript' }));
     const encoderModule = await import(/* @vite-ignore */ glueUrl);
     URL.revokeObjectURL(glueUrl);
     const wasmBytes = await fetchWithProgress(
-      new URL('wasm/julia_webgpu_encode_bg.wasm', base).href, progress, 'wasm-encoder');
+      new URL('wasm/julia_webgpu_encode_bg.wasm', base).href, progress, 'wasm-encoder', 'julia-wasm-encoder.wasm');
     await encoderModule.default({ module_or_path: wasmBytes });
     const tokenizerText = new TextDecoder().decode(await fetchWithProgress(
-      new URL('tokenizer.json', base).href, progress, 'tokenizer.json'));
+      new URL('tokenizer.json', base).href, progress, 'tokenizer.json', 'julia-tokenizer.json'));
     const encoder = new encoderModule.WasmEncoder(tokenizerText);
+    done('wasm-glue');
     done('wasm-encoder');
     done('tokenizer.json');
 
@@ -129,9 +181,9 @@ export class JuliaEngine {
     //    report progress (ORT would otherwise download silently).
     const modelUrl = new URL('model.onnx', base).href;
     const weightsUrl = `${modelUrl}.data`;
-    const modelBytes = await fetchWithProgress(modelUrl, progress, 'model.onnx');
+    const modelBytes = await fetchWithProgress(modelUrl, progress, 'model.onnx', 'julia-model.onnx');
     done('model.onnx');
-    const weightsBytes = await fetchWithProgress(weightsUrl, progress, 'model.onnx.data');
+    const weightsBytes = await fetchWithProgress(weightsUrl, progress, 'model.onnx.data', 'julia-model.onnx.data');
     done('model.onnx.data');
 
     const ort = await import('onnxruntime-web/webgpu');

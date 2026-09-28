@@ -11,7 +11,7 @@ npm install
 npm run dev      # → http://127.0.0.1:5173
 ```
 
-Then click **Load model**. First visit downloads ~590 MB from the Hugging Face CDN (FP32 weights 550 MB + graph 3 MB + tokenizer 34 MB + WASM encoder 3 MB) - the browser caches it afterwards.
+Then click **Load model**. First visit downloads ~590 MB from the Hugging Face CDN (FP32 weights 550 MB + graph 3 MB + tokenizer 34 MB + WASM encoder 3 MB) and stores it in the browser's **Origin Private File System (OPFS)** - so subsequent visits load from disk in seconds, survive restarts, and never re-download. Nothing is sent to any server.
 
 Build for any static host (Cloudflare Pages / GitHub Pages / Netlify / HF Spaces):
 
@@ -23,8 +23,9 @@ npm run build    # → dist/
 
 ```
 index.html          UI shell (loader card, demo tabs, decision form, result panel)
-src/config.js       model CDN URL + context budgets
+src/config.js       model registry (HF CDN URLs) + context budgets
 src/engine.js       inference engine — port of upstream JuliaWebGPU adapter with:
+                    · OPFS-persisted model cache (survives restarts)
                     · streaming per-file download progress
                     · WebGPU → WASM(CPU) execution-provider fallback
                     · true softmax probabilities + raw logits
