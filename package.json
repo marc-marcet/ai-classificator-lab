@@ -1,0 +1,19 @@
+{
+  "name": "julia-decision-playground",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Browser playground for the open Jev-style decision model Julia-1: local WebGPU inference with probability visualization.",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.7.0",
+    "onnxruntime-web": "^1.22.0"
+  },
+  "devDependencies": {
+    "vite": "^8.3.1"
+  }
+}

@@ -1,0 +1,57 @@
+// Preset decisions covering all three request types.
+// `labels` optionally overrides how options are rendered (e.g. for `noul`,
+// where options are the literal false/true descriptions).
+export const DEMOS = [
+  {
+    id: 'routing',
+    name: 'Ticket routing',
+    tag: 'choice',
+    blurb: 'Classify a support ticket into the right team.',
+    state: 'The customer was charged twice for order #48213 and asks for a refund of the duplicate charge. They are visibly frustrated but polite.',
+    question: 'Which team should handle this request?',
+    options: ['Billing & payments', 'Shipping & delivery', 'Account access', 'Technical support'],
+  },
+  {
+    id: 'emotion',
+    name: 'Emotion',
+    tag: 'choice',
+    blurb: 'Six-way emotion classification.',
+    state: 'I just got the exam results and I actually passed with a much better grade than I expected. I cannot stop smiling!',
+    question: 'Which emotion best describes this message?',
+    options: ['Joy', 'Sadness', 'Anger', 'Fear', 'Surprise', 'Neutral'],
+  },
+  {
+    id: 'scam',
+    name: 'Scam detection',
+    tag: 'noul',
+    blurb: 'Boolean decision — probability that it is a scam.',
+    state: 'This is the fraud department. We have issued an arrest warrant in your name. To avoid arrest within 6 hours, pay the fine using iTunes gift cards and read us the codes over the phone.',
+    question: 'Is this message a scam?',
+    options: ['No, this looks legitimate', 'Yes, this is a scam'],
+    labels: ['Legitimate', 'Scam'],
+  },
+  {
+    id: 'urgency',
+    name: 'Urgency score',
+    tag: 'score',
+    blurb: 'Ordered rubric - the winning index is the score. (Score is the model\'s weakest request type.)',
+    state: 'The About page has a typo in the third paragraph. Nothing else is affected.',
+    question: 'How urgent is this bug report?',
+    options: [
+      'Trivial cosmetic issue, fix whenever',
+      'Minor inconvenience, no workaround needed',
+      'Moderate impact, workaround exists',
+      'Major feature broken for many users',
+      'Critical outage or data loss',
+    ],
+  },
+  {
+    id: 'news',
+    name: 'News topic',
+    tag: 'choice',
+    blurb: 'AG News-style four-way topic classification.',
+    state: 'The central bank raised its key interest rate by a quarter of a percentage point, citing persistent inflation in housing and services. Markets rallied on the clearer guidance.',
+    question: 'Which section does this article belong in?',
+    options: ['World', 'Sports', 'Business', 'Science & Technology'],
+  },
+];
