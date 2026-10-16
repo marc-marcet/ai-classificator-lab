@@ -122,6 +122,7 @@ els.loadBtn.addEventListener('click', async () => {
     els.decideBtn.disabled = false;
     els.stressBtn.disabled = false;
     els.app.classList.add('revealed');
+    loadDemo(activeDemo);
   } catch (error) {
     els.loadStatus.textContent = `Load failed: ${error.message ?? error}`;
     els.loadBtn.disabled = false;
@@ -142,17 +143,74 @@ function syncTypeHint() {
 syncTypeHint();
 els.type.addEventListener('change', syncTypeHint);
 
-function loadDemo(demo) {
+/* ---------------- typewriter ---------------- */
+
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const TYPE_CHARS_PER_SEC = 180;
+let typing = null;
+
+function finishTyping() {
+  if (!typing) return;
+  cancelAnimationFrame(typing.raf);
+  for (const [el, text] of typing.fields) {
+    el.value = text;
+    el.classList.remove('typing');
+  }
+  typing = null;
+}
+
+// Types each [element, text] pair in order, one field after another.
+function typeFields(fields) {
+  finishTyping();
+  for (const [el] of fields) el.value = '';
+  const job = { fields, raf: 0 };
+  typing = job;
+  let i = 0;
+  let t0 = performance.now();
+  fields[0][0].classList.add('typing');
+  const tick = (now) => {
+    const [el, text] = fields[i];
+    const n = Math.min(text.length, Math.floor(((now - t0) / 1000) * TYPE_CHARS_PER_SEC));
+    el.value = text.slice(0, n);
+    el.scrollTop = el.scrollHeight;
+    if (n === text.length) {
+      el.classList.remove('typing');
+      if (++i === fields.length) {
+        typing = null;
+        return;
+      }
+      fields[i][0].classList.add('typing');
+      t0 = now;
+    }
+    job.raf = requestAnimationFrame(tick);
+  };
+  job.raf = requestAnimationFrame(tick);
+}
+
+function loadDemo(demo, { animate = true } = {}) {
   activeDemo = demo;
-  els.state.value = demo.state;
-  els.question.value = demo.question;
   els.type.value = demo.tag;
-  els.options.value = demo.options.join('\n');
   els.typeHint.textContent = TYPE_HINTS[demo.tag];
+  const fields = [
+    [els.question, demo.question],
+    [els.state, demo.state],
+    [els.options, demo.options.join('\n')],
+  ];
+  if (animate && !reducedMotion) {
+    typeFields(fields);
+  } else {
+    finishTyping();
+    for (const [el, text] of fields) el.value = text;
+  }
   clearResult();
   for (const tab of els.demoTabs.children) {
     tab.classList.toggle('active', tab.dataset.demo === demo.id);
   }
+}
+
+function stepDemo(delta) {
+  const i = DEMOS.indexOf(activeDemo);
+  loadDemo(DEMOS[(i + delta + DEMOS.length) % DEMOS.length]);
 }
 
 function buildTabs() {
@@ -166,7 +224,7 @@ function buildTabs() {
     tab.addEventListener('click', () => loadDemo(demo));
     els.demoTabs.append(tab);
   }
-  loadDemo(activeDemo);
+  loadDemo(activeDemo, { animate: false });
 }
 buildTabs();
 
@@ -272,6 +330,7 @@ function escapeHtml(text) {
 }
 
 function readRow() {
+  finishTyping();
   const options = els.options.value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
   return {
     state: els.state.value,
@@ -305,6 +364,15 @@ document.addEventListener('keydown', (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !els.decideBtn.disabled) {
     e.preventDefault();
     decide();
+    return;
+  }
+  // Arrow keys switch presets, except where they'd move a caret or change a select.
+  const isArrow = e.key === 'ArrowLeft' || e.key === 'ArrowRight';
+  const hasModifier = e.ctrlKey || e.metaKey || e.altKey || e.shiftKey;
+  const inField = e.target.closest?.('input, textarea, select, [contenteditable]');
+  if (isArrow && !hasModifier && !inField && !els.app.hidden) {
+    e.preventDefault();
+    stepDemo(e.key === 'ArrowRight' ? 1 : -1);
   }
 });
 
@@ -347,6 +415,8 @@ for (const el of [els.state, els.question, els.options]) {
   el.addEventListener('input', clearResult);
 }
 els.type.addEventListener('change', () => {
+  // Clicking into a field mid-animation completes the text so it can be edited.
+  el.addEventListener('focus', finishTyping);
   // Swap in an example matching the selected type so the option format is
   // always valid for it (e.g. noul needs exactly two options: false, true).
   const match = DEMOS.find((demo) => demo.tag === els.type.value);

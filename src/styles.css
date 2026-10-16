@@ -284,7 +284,8 @@ input, textarea, select {
   padding: 10px 12px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-input:focus, textarea:focus, select:focus {
+input:focus, textarea:focus, select:focus,
+input.typing, textarea.typing {
   outline: none;
   border-color: rgba(94, 234, 212, 0.55);
   box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.12);
